@@ -42,7 +42,7 @@ defmodule TwitterEngine.CLI do
   def main(argv) do
     opts = argv |> parse_args
 
-    n_users = 100
+    n_users = 10
 
     # Need to have an address where to host/connect
     if is_nil(opts[:address]) do
@@ -77,6 +77,9 @@ defmodule TwitterEngine.CLI do
         simulator = TwitterEngine.Simulator.start_link(
           %{user_count: n_users, server: remote_pid}
         )
+
+        TwitterEngine.Simulator.setup_users(:zipf)
+        TwitterEngine.Simulator.start_simulation
 
         # Simulation begins here
         :timer.sleep(:infinity)

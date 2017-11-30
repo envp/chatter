@@ -22,29 +22,37 @@ defmodule TwitterEngine.Simulator do
     GenServer.call(__MODULE__, {:setup_users, :zipf})
   end
 
-  def simulate do
+  def start_simulation do
     GenServer.cast(__MODULE__, :simulate)
   end
 
+  defp link_users([h | t]) do
+    t
+    |> Enum.take_random(4)
+    |> Enum.each(fn u -> UserProcess.follow(u, h) end)
+
+    if length(t) > 4, do: link_users(t)
+  end
+
   def init(%{user_count: n}) do
-    state = { 1..n |> Enum.map(fn _ -> UserProcess.start_link end)}
+    Logger.debug "Initializing #{n} distinct processes for each user"
+
+    state = 1..n |>
+      Enum.map(fn _ -> UserProcess.start_link end)
+
     {:ok, state}
   end
 
   def handle_call({:setup_users, :zipf}, _from, state) do
-    # TODO: The returned state should represent connected users as follows:
-    # 1. Create a Zipf distribution of followers
-    # 2. Assign an affinity to each user for creating tweets
-    #    based on their rank in the system
-    {:reply, state}
+    Logger.debug "Linking users into a follower graph"
+
+    user_procs = state
+    link_users(user_procs)
+
+    {:reply, nil, state}
   end
 
   def handle_cast(:simulate, state) do
-    # TODO:
-    # 1. Create a process for each user on the system
-    # 2. Once process creation is done, signal all of the processes to start
-    #     working
-
     {:noreply, state}
   end
 end

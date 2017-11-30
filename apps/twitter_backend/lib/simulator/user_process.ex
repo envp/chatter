@@ -22,6 +22,18 @@ defmodule TwitterEngine.Simulator.UserProcess do
     pid
   end
 
+  def get_user(pid) do
+    GenServer.call(pid, :get_user)
+  end
+
+  def follow(follower_pid, target_pid) do
+    GenServer.cast(follower_pid, {:follow, target_pid})
+  end
+
+  def get_followers(pid) do
+    GenServer.call(pid, :get_followers)
+  end
+
   ##
   # Server API
   ##
@@ -29,6 +41,23 @@ defmodule TwitterEngine.Simulator.UserProcess do
     # Create a user on the server and return the state
     # pid = GenServer.whereis({:global, TwitterEngine.CoreApi})
     TwitterEngine.CoreApi.insert_user(%User{handle: uhandle})
-    {:ok, uhandle}
+    {:ok, TwitterEngine.CoreApi.get_user_by_handle(uhandle)}
+  end
+
+  def handle_call(:get_user, _from, state) do
+    {:reply, state, state}
+  end
+
+  def handle_call(:get_followers, _from, state) do
+    {:reply, TwitterEngine.CoreApi.get_followers(state.id), state}
+  end
+
+  def handle_cast({:follow, target_pid}, state) do
+    %User{id: target_id} = get_user(target_pid)
+    %User{id: follower_id} = state
+
+    TwitterEngine.CoreApi.add_follower(target_id, follower_id)
+
+    {:noreply, state}
   end
 end
