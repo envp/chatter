@@ -3,6 +3,7 @@ defmodule TwitterEngine.Database do
   An abstraction over the data model used by the engine.
   Uses ETS to operate on information
   """
+  @timeout 100_000
 
   use GenServer
 
@@ -16,7 +17,7 @@ defmodule TwitterEngine.Database do
   end
 
   def get_user(pid, user_id) do
-    GenServer.call(pid , {:get_user, user_id})
+    GenServer.call(pid , {:get_user, user_id}, @timeout)
   end
 
   def get_user_by_handle(pid, uhandle) do
@@ -32,11 +33,11 @@ defmodule TwitterEngine.Database do
   end
 
   def user_handle_exists(pid, uhandle) do
-    GenServer.call(pid, {:is_user_handle, uhandle})
+    GenServer.call(pid, {:is_user_handle, uhandle}, @timeout)
   end
 
   def user_id_exists(pid, user_id) do
-    GenServer.call(pid, {:is_user, user_id})
+    GenServer.call(pid, {:is_user, user_id}, @timeout)
   end
 
   def add_follower(pid, target_id, follower_id) do
@@ -52,18 +53,19 @@ defmodule TwitterEngine.Database do
 
   def get_followers(pid, user_id) do
     if user_id_exists(pid, user_id) do
-      GenServer.call(pid, {:get_followers, user_id})
+      GenServer.call(pid, {:get_followers, user_id}, @timeout)
     else
       nil
     end
   end
 
   def insert_tweet(pid, tweet) do
+    # Specifically this to ensure that tweet sequence numbers are increasing
     GenServer.cast(pid, {:insert_tweet, tweet})
   end
 
   def get_tweet_ids(pid, user_id) do
-    GenServer.call(pid, {:get_tweet_ids, user_id})
+    GenServer.call(pid, {:get_tweet_ids, user_id}, @timeout)
   end
 
   def get_tweet_contents(pid, ids) when is_list(ids) do
@@ -72,7 +74,7 @@ defmodule TwitterEngine.Database do
   def get_tweet_contents(pid, tweet_id), do: get_tweet_contents(pid, [tweet_id])
 
   def get_mentions(pid, user_id) do
-    GenServer.call(pid, {:get_mentions, user_id})
+    GenServer.call(pid, {:get_mentions, user_id}, @timeout)
   end
 
   def get_hashtag_tweets(pid, tag) do
@@ -80,13 +82,14 @@ defmodule TwitterEngine.Database do
   end
 
   def get_last_tweet_id(pid) do
-    GenServer.call(pid, :get_last_tweet_id)
+    GenServer.call(pid, :get_last_tweet_id, @timeout)
   end
 
   ##
   # Server API
   ##
   def init(:ok) do
+    Logger.debug "Initializing database at #{inspect self()}"
     # Table of users
     :ets.new(:users, [:set, :private, :named_table])
 
@@ -116,14 +119,9 @@ defmodule TwitterEngine.Database do
   # Calls
   #
   def handle_call({:is_user, user_id}, _from, state) do
-    Logger.debug "Query {:is_user, #{user_id}}"
+    Logger.debug "Query {:is_user, #{inspect user_id}}"
 
-    response = case :ets.lookup(:users, user_id) do
-      [{_, _user}] ->
-        true
-      [] ->
-        false
-    end
+    response = :ets.member(:users, user_id)
 
     {:reply, response, state}
   end
@@ -267,8 +265,7 @@ defmodule TwitterEngine.Database do
     {:noreply, state}
   end
 
-  def handle_cast({:insert_tweet, tweet}, state) do
-    {_, tweet_seqnum, user_inverse} = state
+  def handle_cast({:insert_tweet, tweet}, {user_seqnum, tweet_seqnum, user_inverse}) do
     tweet = %{tweet | id: tweet_seqnum + 1}
 
     Logger.debug "Insert tweet #{inspect tweet}"
@@ -289,6 +286,6 @@ defmodule TwitterEngine.Database do
     tweet.hashtags
     |> Enum.each(fn htag -> :ets.insert(:hashtags, {htag, tweet.id}) end)
 
-    {:noreply, state}
+    {:noreply, {user_seqnum, tweet_seqnum + 1, user_inverse}}
   end
 end

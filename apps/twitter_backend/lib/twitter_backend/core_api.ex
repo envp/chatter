@@ -3,6 +3,8 @@ defmodule TwitterEngine.CoreApi do
   Workers representing the core API of our twitter clone
   """
 
+  @timeout 100_000
+
   alias TwitterEngine.Database, as: Db
   alias TwitterEngine.Tweet
 
@@ -18,11 +20,11 @@ defmodule TwitterEngine.CoreApi do
   end
 
   def get_user(user_id) do
-    GenServer.call({:global, __MODULE__}, {:get_user, user_id})
+    GenServer.call({:global, __MODULE__}, {:get_user, user_id}, @timeout)
   end
 
   def get_user_by_handle(uhandle) do
-    GenServer.call({:global, __MODULE__}, {:get_user_by_handle, uhandle})
+    GenServer.call({:global, __MODULE__}, {:get_user_by_handle, uhandle}, @timeout)
   end
 
   def insert_user(user) do
@@ -34,7 +36,7 @@ defmodule TwitterEngine.CoreApi do
   end
 
   def get_followers(user_id) do
-    GenServer.call({:global, __MODULE__}, {:get_followers, user_id})
+    GenServer.call({:global, __MODULE__}, {:get_followers, user_id}, @timeout)
   end
 
   def create_tweet(user_id, message) do
@@ -42,25 +44,26 @@ defmodule TwitterEngine.CoreApi do
   end
 
   def get_user_tweets(user_id) do
-    GenServer.call({:global, __MODULE__}, {:get_user_tweets, user_id})
+    GenServer.call({:global, __MODULE__}, {:get_user_tweets, user_id}, @timeout)
   end
 
   def get_mention_tweets(user_id) do
-    GenServer.call({:global, __MODULE__}, {:get_mention_tweets, user_id})
+    GenServer.call({:global, __MODULE__}, {:get_mention_tweets, user_id}, @timeout)
   end
 
   def get_hashtag_tweets(tag) do
-    GenServer.call({:global, __MODULE__}, {:get_hashtag_tweets, tag})
+    GenServer.call({:global, __MODULE__}, {:get_hashtag_tweets, tag}, @timeout)
   end
 
   def get_last_tweet_id do
-    GenServer.call({:global, __MODULE__}, :get_last_tweet_id)
+    GenServer.call({:global, __MODULE__}, :get_last_tweet_id, @timeout)
   end
 
   ##
   # Server API
   ##
   def init(%{db: pid}) do
+    Logger.debug "Initalize API at #{inspect self()} with db at #{inspect pid}"
     {:ok, %{db: pid}}
   end
 

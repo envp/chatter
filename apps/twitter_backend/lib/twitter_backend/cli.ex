@@ -42,7 +42,7 @@ defmodule TwitterEngine.CLI do
   def main(argv) do
     opts = argv |> parse_args
 
-    n_users = 10
+    n_users = 10_000
 
     # Need to have an address where to host/connect
     if is_nil(opts[:address]) do
@@ -69,8 +69,10 @@ defmodule TwitterEngine.CLI do
         # Attempt to join a known network that is the bee's knees or die trying
         join_or_die(rem_name)
 
+        :global.sync
+
         # Get the remote PID of the server process to start the simulator with
-        remote_pid = :global.whereis_name(__MODULE__)
+        remote_pid = :global.whereis_name(TwiiterEngine.CoreApi)
 
         # Start the simulator by telling it how many users to simulate
         # and where the remote process lives
@@ -80,6 +82,8 @@ defmodule TwitterEngine.CLI do
 
         TwitterEngine.Simulator.setup_users(:zipf)
         TwitterEngine.Simulator.start_simulation
+
+        Logger.info "End of simulation"
 
         # Simulation begins here
         :timer.sleep(:infinity)
