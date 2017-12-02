@@ -6,6 +6,7 @@ defmodule TwitterEngine.CoreApi do
   @timeout 100_000
 
   alias TwitterEngine.Database, as: Db
+  alias TwitterEngine.Feed
   alias TwitterEngine.Tweet
 
   use GenServer
@@ -16,8 +17,12 @@ defmodule TwitterEngine.CoreApi do
   # Client API
   ##
 
-  def start_link(%{db: pid}) do
-    GenServer.start_link(__MODULE__, %{db: pid}, name: {:global, __MODULE__})
+  def start_link(%{db: db_pid, feed: feed_pid}) do
+    GenServer.start_link(
+      __MODULE__,
+      %{db: db_pid, feed: feed_pid},
+      name: {:global, __MODULE__}
+    )
   end
 
   def get_user(user_id) do
@@ -45,7 +50,10 @@ defmodule TwitterEngine.CoreApi do
   end
 
   def create_tweet(user_id, message) do
-    GenServer.cast({:global, __MODULE__}, {:create_tweet, user_id, Tweet.parse(message)})
+    GenServer.cast(
+      {:global, __MODULE__},
+      {:create_tweet, user_id, Tweet.parse(message)}
+    )
   end
 
   def get_user_tweets(user_id) do
@@ -67,9 +75,9 @@ defmodule TwitterEngine.CoreApi do
   ##
   # Server API
   ##
-  def init(%{db: pid}) do
-    Logger.info "Initalize API at #{inspect self()} with db at #{inspect pid}"
-    {:ok, %{db: pid}}
+  def init(%{db: db_pid, feed: feed_pid}) do
+    Logger.info "Initalize API at #{inspect self()} with db at #{inspect db_pid}"
+    {:ok, %{db: db_pid, feed: feed_pid}}
   end
 
   #

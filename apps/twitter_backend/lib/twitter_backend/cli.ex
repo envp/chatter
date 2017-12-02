@@ -35,9 +35,10 @@ defmodule TwitterEngine.CLI do
 
   defp start_backend_server do
     {:ok, db_pid} = TwitterEngine.Database.start_link
+    {:ok, feed_pid} = TwitterEngine.Feed.start_link
 
     Logger.debug("Starting twitter server actor. Waiting for connections.")
-    TwitterEngine.CoreApi.start_link(%{db: db_pid})
+    TwitterEngine.CoreApi.start_link(%{db: db_pid, feed: feed_pid})
   end
 
   def main(argv) do
