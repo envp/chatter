@@ -132,7 +132,7 @@ defmodule TwitterEngine.CoreApi do
 
   def handle_cast({:create_tweet, user_id, tweet}, state) do
     if Db.user_id_exists(state.db, user_id) do
-      Db.insert_tweet(state.db, %{tweet | src_id: user_id})
+      Db.insert_tweet(state.db, state.feed, %{tweet | src_id: user_id})
     end
     {:noreply, state}
   end

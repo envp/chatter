@@ -59,9 +59,9 @@ defmodule TwitterEngine.Database do
     end
   end
 
-  def insert_tweet(pid, tweet) do
+  def insert_tweet(pid, feed_pid, tweet) do
     # Specifically this to ensure that tweet sequence numbers are increasing
-    GenServer.cast(pid, {:insert_tweet, tweet})
+    GenServer.cast(pid, {:insert_tweet, feed_pid, tweet})
   end
 
   def get_tweet_ids(pid, user_id) do
@@ -265,7 +265,7 @@ defmodule TwitterEngine.Database do
     {:noreply, state}
   end
 
-  def handle_cast({:insert_tweet, tweet}, {user_seqnum, tweet_seqnum, user_inverse}) do
+  def handle_cast({:insert_tweet, feed_pid, tweet}, {user_seqnum, tweet_seqnum, user_inverse}) do
     tweet = %{tweet | id: tweet_seqnum + 1}
 
     Logger.debug "Insert tweet #{inspect tweet}"
@@ -276,11 +276,24 @@ defmodule TwitterEngine.Database do
     # Add a reference to the row number in the user_tweets table
     :ets.insert(:user_tweets, {tweet.src_id, tweet.id})
 
+    # Add this user's tweet to the follower's feed
+    :ets.lookup(:followers, tweet.src_id)
+    |> Enum.map(fn {_, v} -> v end)
+    |> Enum.each(fn f_id->
+      TwitterEngine.Feed.push(feed_pid, {f_id, tweet.id})
+    end)
+
+
     # Insert this tweet id for its mentions
     tweet.mentions
     |> Enum.map(fn uhandle -> Map.fetch(user_inverse, uhandle) end)
-    |> Enum.each(fn m_id -> :ets.insert(:mentions, {m_id, tweet.id}) end)
+    |> Enum.each(fn m_id ->
+      # Insert into mentions
+      :ets.insert(:mentions, {m_id, tweet.id})
 
+      # Also record this in the feed
+      TwitterEngine.Feed.push(feed_pid, {m_id, tweet.id})
+    end)
 
     # Insert this tweet into its hashtags table
     tweet.hashtags

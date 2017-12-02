@@ -95,7 +95,8 @@ defmodule TwitterEngine.Simulator.UserProcess do
 
     # Keep tweeting every 100ms
     new_message = @message_size |> :crypto.strong_rand_bytes |> Base.encode16
-    Process.send_after(self(), {:"$gen_cast", {:chatter, new_message}}, 1)
+    # Call self again
+    Process.send_after(self(), {:"$gen_cast", {:chatter, new_message}}, 10)
 
     TwitterEngine.CoreApi.create_tweet(user.id, message)
 

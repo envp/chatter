@@ -5,10 +5,17 @@ defmodule TwitterEngine.Feed do
   notifications without bombarding the database process with the most frequent
   kind of request (Hint: READ)
 
-  Implemented as a stack because we want the most recent messages first
+  Implemented as a stack because we want the most recent messages first.
+
+  If the stack reaches its maximum size, the bottom half
+  is automatically discarded
   """
 
   use GenServer
+
+  require Logger
+
+  @max_size 1024
 
   def start_link do
     GenServer.start_link(__MODULE__, [])
@@ -85,7 +92,17 @@ defmodule TwitterEngine.Feed do
     new_state = if items == [] do
       Map.put(state, id, [item])
     else
-      Map.put(state, id, [item | items])
+      # Check for potential overflow and discard the bottom half
+      {trimmed_items, _} = if length(items) >= @max_size do
+        Logger.warn "Trimming feed storage for user: #{id}"
+        n = (length(items) / 2) |> :math.floor |> round
+
+        Enum.split(items, n)
+      else
+        {items, []}
+      end
+
+      Map.put(state, id, [item | trimmed_items])
     end
 
     {:noreply, new_state}
