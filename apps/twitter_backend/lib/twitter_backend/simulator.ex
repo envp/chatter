@@ -24,9 +24,26 @@ defmodule TwitterEngine.Simulator do
 
   def start_simulation do
     GenServer.cast(__MODULE__, :simulate)
-    # Process.send_after(self(), :simulate, 1000)
-    :timer.sleep(1)
-    start_simulation
+  end
+
+  def print_metrics({prev_count, then_time}) do
+    {curr_count, now_time} = TwitterEngine.CoreApi.get_metrics()
+
+    num_tweets = curr_count - prev_count
+    interval = :timer.now_diff(now_time, then_time)
+
+    tweet_rate = if interval > 0 do
+      1.0e+6 * (num_tweets / interval)
+    else
+      -1
+    end
+
+    Logger.info "Tweets / s: #{tweet_rate}"
+
+    # Don't bombard the server
+    :timer.sleep(1000)
+
+    print_metrics({curr_count, now_time})
   end
 
   defp link_users(user_list) do
@@ -51,7 +68,7 @@ defmodule TwitterEngine.Simulator do
   end
 
   def init(%{user_count: n}) do
-    Logger.debug "Initializing #{n} distinct processes for each user"
+    Logger.info "Initializing #{n} distinct processes for each user"
 
     state = 1..n |>
       Enum.map(fn _ -> UserProcess.start_link end)
@@ -62,18 +79,19 @@ defmodule TwitterEngine.Simulator do
   end
 
   def handle_call({:setup_users, :zipf}, _from, state) do
-    Logger.debug "Linking users into a follower graph"
+    Logger.info "Linking users into a follower graph"
 
     user_procs = state
     link_users(user_procs)
 
+    Logger.info "Completed linkage"
     {:reply, nil, state}
   end
 
   def handle_cast(:simulate, state) do
-    # TODO: Everybody starts talking
-    user_procs = state
+    Process.send_after(self(), {:"$gen_cast", :simulate}, 100)
 
+    user_procs = state
     user_procs
     |> Enum.each(
       fn u ->
@@ -82,7 +100,6 @@ defmodule TwitterEngine.Simulator do
           10 |>:crypto.strong_rand_bytes |> Base.encode16
         )
       end)
-
     {:noreply, state}
   end
 

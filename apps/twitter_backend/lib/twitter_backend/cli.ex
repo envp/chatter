@@ -8,7 +8,8 @@ defmodule TwitterEngine.CLI do
       argv,
       switches: [
         mode: :string,
-        address: :string
+        address: :string,
+        size: :integer
       ]
     )
 
@@ -42,12 +43,12 @@ defmodule TwitterEngine.CLI do
   def main(argv) do
     opts = argv |> parse_args
 
-    n_users = 10_000
+    n_users = opts[:size] || 100
 
     # Need to have an address where to host/connect
     if is_nil(opts[:address]) do
-      Logger.error("Need to specify --address=<host-ip-address")
-      exit("Need to specify --address=<host-ip-address")
+      Logger.error("Please specify --address=<host-ip-address>")
+      exit("Need to specify --address=<host-ip-address>")
     end
 
     # Process according to mode once all params are in place
@@ -71,20 +72,15 @@ defmodule TwitterEngine.CLI do
 
         :global.sync
 
-        # Get the remote PID of the server process to start the simulator with
-        remote_pid = :global.whereis_name(TwiiterEngine.CoreApi)
-
         # Start the simulator by telling it how many users to simulate
         # and where the remote process lives
-        simulator = TwitterEngine.Simulator.start_link(
-          %{user_count: n_users, server: remote_pid}
-        )
+        TwitterEngine.Simulator.start_link(%{user_count: n_users})
 
         TwitterEngine.Simulator.setup_users(:zipf)
         TwitterEngine.Simulator.start_simulation
+        TwitterEngine.Simulator.print_metrics({0, :os.timestamp})
 
         Logger.info "End of simulation"
-
         # Simulation begins here
         :timer.sleep(:infinity)
 

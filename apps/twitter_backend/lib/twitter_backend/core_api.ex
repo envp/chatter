@@ -15,12 +15,17 @@ defmodule TwitterEngine.CoreApi do
   ##
   # Client API
   ##
+
   def start_link(%{db: pid}) do
     GenServer.start_link(__MODULE__, %{db: pid}, name: {:global, __MODULE__})
   end
 
   def get_user(user_id) do
     GenServer.call({:global, __MODULE__}, {:get_user, user_id}, @timeout)
+  end
+
+  def get_metrics do
+    {get_last_tweet_id(), :os.timestamp}
   end
 
   def get_user_by_handle(uhandle) do
@@ -63,7 +68,7 @@ defmodule TwitterEngine.CoreApi do
   # Server API
   ##
   def init(%{db: pid}) do
-    Logger.debug "Initalize API at #{inspect self()} with db at #{inspect pid}"
+    Logger.info "Initalize API at #{inspect self()} with db at #{inspect pid}"
     {:ok, %{db: pid}}
   end
 

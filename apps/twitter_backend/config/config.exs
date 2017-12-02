@@ -18,7 +18,8 @@ config :twitter_backend, cookie: :__twitter_ex_backend_test__
 #
 # You can also configure a 3rd-party app:
 #
-#     config :logger, level: :info
+config :logger, level: :info
+
 #
 
 # It is also possible to import configuration files, relative to this

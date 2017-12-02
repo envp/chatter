@@ -89,7 +89,7 @@ defmodule TwitterEngine.Database do
   # Server API
   ##
   def init(:ok) do
-    Logger.debug "Initializing database at #{inspect self()}"
+    Logger.info "Initializing database at #{inspect self()}"
     # Table of users
     :ets.new(:users, [:set, :private, :named_table])
 
