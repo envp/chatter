@@ -89,32 +89,14 @@ defmodule TwitterEngine.Simulator do
   end
 
   def handle_cast(:simulate, state) do
-    Process.send_after(self(), {:"$gen_cast", :simulate}, 100)
+    # Simulate only fires up the user processes
 
     user_procs = state
     user_procs
     |> Enum.each(
       fn u ->
-        %{id: id} = UserProcess.get_user(u)
-        TwitterEngine.CoreApi.create_tweet(id,
-          10 |>:crypto.strong_rand_bytes |> Base.encode16
-        )
+        UserProcess.chatter(u, 10 |>:crypto.strong_rand_bytes |> Base.encode16)
       end)
-    {:noreply, state}
-  end
-
-  def handle_info(:simulate, state) do
-    user_procs = state
-
-    user_procs
-    |> Enum.each(
-    fn u ->
-      %{id: id} = UserProcess.get_user(u)
-      TwitterEngine.CoreApi.create_tweet(id,
-        10 |>:crypto.strong_rand_bytes |> Base.encode16
-      )
-    end)
-
     {:noreply, state}
   end
 end

@@ -10,6 +10,9 @@ defmodule TwitterEngine.Simulator.UserProcess do
 
   require Logger
 
+  # 10 random bytes
+  @message_size 10
+
   ##
   # Client API
   ##
@@ -46,7 +49,7 @@ defmodule TwitterEngine.Simulator.UserProcess do
     GenServer.cast(pid, {:set_affinity, aff})
   end
 
-  def tweet(pid, message) do
+  def chatter(pid, message) do
     GenServer.cast(pid, {:chatter, message})
   end
 
@@ -89,9 +92,13 @@ defmodule TwitterEngine.Simulator.UserProcess do
 
   def handle_cast({:chatter, message}, {user, aff}) do
     Logger.debug "User #[user.id} attempting to tweet message: #{message}"
-    if :rand.uniform < aff do
-      TwitterEngine.CoreApi.create_tweet(user.id, message)
-    end
+
+    # Keep tweeting every 100ms
+    new_message = @message_size |> :crypto.strong_rand_bytes |> Base.encode16
+    Process.send_after(self(), {:"$gen_cast", {:chatter, new_message}}, 1)
+
+    TwitterEngine.CoreApi.create_tweet(user.id, message)
+
     {:noreply, {user, aff}}
   end
 end
