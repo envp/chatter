@@ -2,7 +2,12 @@ defmodule TwitterEngine.Tweet do
   @moduledoc """
   Module representing a tweet in the system
   """
-  defstruct id: nil, src_id: nil, text: nil, mentions: [], hashtags: []
+  defstruct id: nil,
+            src_id: nil,
+            creator_id: nil,
+            text: nil,
+            mentions: [],
+            hashtags: []
 
   # Parses the message to extract mentions and hashtags
   def parse(msg) do

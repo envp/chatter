@@ -6,7 +6,6 @@ defmodule TwitterEngine.CoreApi do
   @timeout 100_000
 
   alias TwitterEngine.Database, as: Db
-  alias TwitterEngine.Feed
   alias TwitterEngine.Tweet
 
   use GenServer
@@ -72,11 +71,15 @@ defmodule TwitterEngine.CoreApi do
     GenServer.call({:global, __MODULE__}, :get_last_tweet_id, @timeout)
   end
 
+  def retweet(user_id, tweet_id) do
+    GenServer.cast({:global, __MODULE__}, {:retweet, tweet_id, user_id})
+  end
+
   ##
   # Server API
   ##
   def init(%{db: db_pid, feed: feed_pid}) do
-    Logger.info "Initalize API at #{inspect self()} with db at #{inspect db_pid}"
+    Logger.info "Initalized API at #{inspect self()} with db at #{inspect db_pid}"
     {:ok, %{db: db_pid, feed: feed_pid}}
   end
 
@@ -132,8 +135,15 @@ defmodule TwitterEngine.CoreApi do
 
   def handle_cast({:create_tweet, user_id, tweet}, state) do
     if Db.user_id_exists(state.db, user_id) do
-      Db.insert_tweet(state.db, state.feed, %{tweet | src_id: user_id})
+      Db.insert_tweet(state.db, state.feed, %{tweet | src_id: user_id, creator_id: user_id})
     end
     {:noreply, state}
+  end
+
+  def handle_cast({:retweet, tweet_id, user_id}, state) do
+    if Db.user_id_exists(state.db, user_id) && Db.tweet_id_exists(state.db, tweet_id) do
+      tweet = %{Db.get_tweet(state.db, tweet_id) | creator_id: user_id}
+      Db.insert_retweet(state.db, state.feed, tweet)
+    end
   end
 end

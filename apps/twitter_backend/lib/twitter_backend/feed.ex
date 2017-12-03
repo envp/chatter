@@ -94,7 +94,7 @@ defmodule TwitterEngine.Feed do
     else
       # Check for potential overflow and discard the bottom half
       {trimmed_items, _} = if length(items) >= @max_size do
-        Logger.warn "Trimming feed storage for user: #{id}"
+        Logger.debug "Trimming feed storage for user: #{id}"
         n = (length(items) / 2) |> :math.floor |> round
 
         Enum.split(items, n)

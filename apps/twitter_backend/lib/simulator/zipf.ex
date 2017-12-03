@@ -29,7 +29,7 @@ defmodule TwitterEngine.Simulator.Zipf do
     |> Enum.map(fn p ->
         resources |> Enum.take_random(
           m * p
-          |> :math.ceil
+          |> :math.floor
           |> round
         )
       end)

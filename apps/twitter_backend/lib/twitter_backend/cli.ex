@@ -1,5 +1,40 @@
 defmodule TwitterEngine.CLI do
+  @moduledoc """
+  CLI interface for spawning TwitterEngine server, simulators and clients to
+  interact with the server. Supports the following command line switches. Note
+  that the server is a singleton process, there cannot be more than one of these
+  on EPMD network
 
+  A switch can be set with either --switch-name=<parameter> for non-boolean
+  switches, and --switch-name for boolean switches.
+
+  The binaries rely on EPMD running in daemon mode. Run `epmd -daemon` prior to
+  executing the CLI module to ensure that is pre-condition is met. The code will
+  not function without an active EPMD daemon
+
+  --help
+            Print this wall of text
+
+  --mode=<server|simulator|client>
+            server    Run the API and database servers.
+            simulator Run a simulator instance to simulate parallel users
+                      tweeting at each other through the API server
+            client    Runs a command-based client to interact with the internals
+                      of the API server
+
+  --address=<host-addr>
+            The IP address of the API server. Currently I only support 127.0.0.1
+            This is a *mandatory* parameter
+
+  --size=<k>
+            The simulation size in the number of users
+
+  --nchar=<n>
+            The mean number of characters per simulated tweet, defaults to 20 or
+            an average english sentence (including mentions and hashtags)
+  --uname=<name>
+            Username to use when registering with the API server as a client
+  """
   require OptionParser
   require Logger
 
@@ -9,7 +44,10 @@ defmodule TwitterEngine.CLI do
       switches: [
         mode: :string,
         address: :string,
-        size: :integer
+        size: :integer,
+        nchar: :integer,
+        help: :boolean,
+        uname: :string
       ]
     )
 
@@ -44,51 +82,58 @@ defmodule TwitterEngine.CLI do
   def main(argv) do
     opts = argv |> parse_args
 
-    n_users = opts[:size] || 100
+    if opts[:help] do
+      IO.puts @moduledoc
+    else
+      n_users = opts[:size] || 100
+      tw_size = opts[:nchar] || 20
 
-    # Need to have an address where to host/connect
-    if is_nil(opts[:address]) do
-      Logger.error("Please specify --address=<host-ip-address>")
-      exit("Need to specify --address=<host-ip-address>")
-    end
+      # Need to have an address where to host/connect
+      if is_nil(opts[:address]) do
+        Logger.error("Please specify --address=<host-ip-address>")
+        exit("Need to specify --address=<host-ip-address>")
+      end
 
-    # Process according to mode once all params are in place
-    case opts[:mode] do
-      "server" ->
-        own_name = :erlang.list_to_atom('master@' ++ to_charlist(opts[:address]))
-        setup_distributed_node(own_name)
-        start_backend_server()
+      # Process according to mode once all params are in place
+      case opts[:mode] do
+        "server" ->
+          own_name = :erlang.list_to_atom('master@' ++ to_charlist(opts[:address]))
+          setup_distributed_node(own_name)
+          start_backend_server()
 
-        :timer.sleep(:infinity)
+          :timer.sleep(:infinity)
 
-      "simulator" ->
-        rem_name = :erlang.list_to_atom('master@' ++ to_charlist(opts[:address]))
-        own_name = :erlang.list_to_atom('simulator@' ++ to_charlist(opts[:address]))
+        "simulator" ->
+          rem_name = :erlang.list_to_atom('master@' ++ to_charlist(opts[:address]))
+          own_name = :erlang.list_to_atom('simulator@' ++ to_charlist(opts[:address]))
 
-        # Set self as an EPMD node
-        setup_distributed_node(own_name)
+          # Set self as an EPMD node
+          setup_distributed_node(own_name)
 
-        # Attempt to join a known network that is the bee's knees or die trying
-        join_or_die(rem_name)
+          # Attempt to join a known network that is the bee's knees or die trying
+          join_or_die(rem_name)
 
-        :global.sync
+          :global.sync
 
-        # Start the simulator by telling it how many users to simulate
-        # and where the remote process lives
-        TwitterEngine.Simulator.start_link(%{user_count: n_users})
+          # Start the simulator by telling it how many users to simulate
+          # and where the remote process lives
+          TwitterEngine.Simulator.start_link(
+            %{user_count: n_users, nchar: tw_size}
+          )
 
-        TwitterEngine.Simulator.setup_users(:zipf)
-        TwitterEngine.Simulator.start_simulation
-        TwitterEngine.Simulator.print_metrics({0, :os.timestamp})
+          TwitterEngine.Simulator.setup_users(:zipf)
+          TwitterEngine.Simulator.start_simulation
+          TwitterEngine.Simulator.print_metrics({0, :os.timestamp})
 
-        Logger.info "End of simulation"
-        # Simulation begins here
-        :timer.sleep(:infinity)
+          Logger.info "End of simulation"
+          # Simulation begins here
+          :timer.sleep(:infinity)
 
       # "client" ->
-        # TODO: Part 2 of project!
+
       _ ->
         Logger.error("Unknown option for mode: #{opts[:mode]}")
+      end
     end
   end
 end

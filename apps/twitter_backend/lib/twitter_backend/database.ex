@@ -20,6 +20,10 @@ defmodule TwitterEngine.Database do
     GenServer.call(pid , {:get_user, user_id}, @timeout)
   end
 
+  def get_tweet(pid, tweet_id) do
+    GenServer.call(pid , {:get_tweet, tweet_id}, @timeout)
+  end
+
   def get_user_by_handle(pid, uhandle) do
     GenServer.call(pid, {:get_user_by_handle, uhandle})
   end
@@ -38,6 +42,10 @@ defmodule TwitterEngine.Database do
 
   def user_id_exists(pid, user_id) do
     GenServer.call(pid, {:is_user, user_id}, @timeout)
+  end
+
+  def tweet_id_exists(pid, tweet_id) do
+    GenServer.call(pid, {:is_tweet, tweet_id}, @timeout)
   end
 
   def add_follower(pid, target_id, follower_id) do
@@ -62,6 +70,11 @@ defmodule TwitterEngine.Database do
   def insert_tweet(pid, feed_pid, tweet) do
     # Specifically this to ensure that tweet sequence numbers are increasing
     GenServer.cast(pid, {:insert_tweet, feed_pid, tweet})
+  end
+
+  def insert_retweet(pid, feed_pid, tweet) do
+    # Specifically this to ensure that tweet sequence numbers are increasing
+    GenServer.cast(pid, {:insert_retweet, feed_pid, tweet})
   end
 
   def get_tweet_ids(pid, user_id) do
@@ -91,22 +104,22 @@ defmodule TwitterEngine.Database do
   def init(:ok) do
     Logger.info "Initializing database at #{inspect self()}"
     # Table of users
-    :ets.new(:users, [:set, :private, :named_table])
+    :ets.new(:users, [:set, :private, :named_table, read_concurrency: true, write_concurrency: true])
 
     # Table of tweet records
-    :ets.new(:tweets, [:set, :private, :named_table])
+    :ets.new(:tweets, [:set, :private, :named_table, read_concurrency: true, write_concurrency: true])
 
     # Table of tweet ids for each user id
-    :ets.new(:user_tweets, [:bag, :private, :named_table])
+    :ets.new(:user_tweets, [:bag, :private, :named_table, read_concurrency: true, write_concurrency: true])
 
     # Table of tweet ids for each user mention
-    :ets.new(:mentions, [:bag, :private, :named_table])
+    :ets.new(:mentions, [:bag, :private, :named_table, read_concurrency: true, write_concurrency: true])
 
     # Table of tweet ids for each hashtag
-    :ets.new(:hashtags, [:bag, :private, :named_table])
+    :ets.new(:hashtags, [:bag, :private, :named_table, read_concurrency: true, write_concurrency: true])
 
     # User ids linked to each follower id
-    :ets.new(:followers, [:bag, :private, :named_table])
+    :ets.new(:followers, [:bag, :private, :named_table, read_concurrency: true, write_concurrency: true])
 
     # Inverse-map of user handle to user id
     user_inverse  = %{}
@@ -122,6 +135,14 @@ defmodule TwitterEngine.Database do
     Logger.debug "Query {:is_user, #{inspect user_id}}"
 
     response = :ets.member(:users, user_id)
+
+    {:reply, response, state}
+  end
+
+  def handle_call({:is_tweet, tweet_id}, _from, state) do
+    Logger.debug "Query {:is_tweet, #{inspect tweet_id}}"
+
+    response = :ets.member(:tweets, tweet_id)
 
     {:reply, response, state}
   end
@@ -144,6 +165,20 @@ defmodule TwitterEngine.Database do
         :error
     end
     Logger.debug "Response {:get_user, #{user_id}}: #{inspect response}"
+    {:reply, response, state}
+  end
+
+  def handle_call({:get_tweet, tweet_id}, _from, state) do
+    Logger.debug "Query {:get_tweet, #{tweet_id}}"
+
+    # There is only 1 user per id
+    response = case :ets.lookup(:tweets, tweet_id) do
+      [{_, tweet}] ->
+        tweet
+      [] ->
+        :error
+    end
+    Logger.debug "Response {:get_tweet, #{tweet_id}}: #{inspect response}"
     {:reply, response, state}
   end
 
@@ -274,10 +309,10 @@ defmodule TwitterEngine.Database do
     :ets.insert(:tweets, {tweet.id, tweet})
 
     # Add a reference to the row number in the user_tweets table
-    :ets.insert(:user_tweets, {tweet.src_id, tweet.id})
+    :ets.insert(:user_tweets, {tweet.creator_id, tweet.id})
 
     # Add this user's tweet to the follower's feed
-    :ets.lookup(:followers, tweet.src_id)
+    :ets.lookup(:followers, tweet.creator_id)
     |> Enum.map(fn {_, v} -> v end)
     |> Enum.each(fn f_id->
       TwitterEngine.Feed.push(feed_pid, {f_id, tweet.id})
@@ -298,6 +333,46 @@ defmodule TwitterEngine.Database do
     # Insert this tweet into its hashtags table
     tweet.hashtags
     |> Enum.each(fn htag -> :ets.insert(:hashtags, {htag, tweet.id}) end)
+
+    {:noreply, {user_seqnum, tweet_seqnum + 1, user_inverse}}
+  end
+
+  def handle_cast({:insert_retweet, feed_pid, tweet}, {user_seqnum, tweet_seqnum, user_inverse}) do
+    tweet = %{tweet | id: tweet_seqnum + 1}
+
+    Logger.debug "Insert re-tweet #{inspect tweet}"
+
+    # Insert it into the primary table storing tweets sequentially
+    :ets.insert(:tweets, {tweet.id, tweet})
+
+    # Add a reference to the row number in the user_tweets table
+    :ets.insert(:user_tweets, {tweet.creator_id, tweet.id})
+
+    # Add this user's tweet to the follower's feed
+    :ets.lookup(:followers, tweet.creator_id)
+    |> Enum.map(fn {_, v} -> v end)
+    |> Enum.each(fn f_id->
+      TwitterEngine.Feed.push(feed_pid, {f_id, tweet.id})
+    end)
+
+    ##################################################################
+    ## Re-tweets do not undergo the mention and hashtags processing ##
+    ##################################################################
+
+    # # Insert this tweet id for its mentions
+    # tweet.mentions
+    # |> Enum.map(fn uhandle -> Map.fetch(user_inverse, uhandle) end)
+    # |> Enum.each(fn m_id ->
+    #   # Insert into mentions
+    #   :ets.insert(:mentions, {m_id, tweet.id})
+
+    #   # Also record this in the feed
+    #   TwitterEngine.Feed.push(feed_pid, {m_id, tweet.id})
+    # end)
+
+    # # Insert this tweet into its hashtags table
+    # tweet.hashtags
+    # |> Enum.each(fn htag -> :ets.insert(:hashtags, {htag, tweet.id}) end)
 
     {:noreply, {user_seqnum, tweet_seqnum + 1, user_inverse}}
   end

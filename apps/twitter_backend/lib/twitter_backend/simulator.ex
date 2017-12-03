@@ -12,8 +12,12 @@ defmodule TwitterEngine.Simulator do
 
   require Logger
 
-  def start_link(%{user_count: uc}) do
-    {:ok, pid} = GenServer.start_link(__MODULE__, %{user_count: uc}, name: __MODULE__)
+  def start_link(%{user_count: uc, nchar: nchar}) do
+    {:ok, pid} = GenServer.start_link(
+      __MODULE__,
+      %{user_count: uc, nchar: nchar},
+      name: __MODULE__)
+
     pid
   end
 
@@ -35,7 +39,7 @@ defmodule TwitterEngine.Simulator do
     tweet_rate = if interval > 0 do
       1.0e+6 * (num_tweets / interval)
     else
-      -1
+      0
     end
 
     Logger.info "Tweets / s: #{tweet_rate}"
