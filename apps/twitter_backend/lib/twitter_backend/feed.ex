@@ -45,6 +45,15 @@ defmodule TwitterEngine.Feed do
     GenServer.cast(pid, :flush_all)
   end
 
+  def live_feed(pid, {node, remote_pid, id}) do
+    spawn fn ->
+      item = pop(pid, id)
+      :rpc.call(node, UserProcess, :print_tweet, item)
+      online = :rpc.call(node, UserProcess, :is_online, remote_pid)
+      if item != [] && online, do: live_feed(pid, {node, id})
+    end
+  end
+
   def init([]) do
     {:ok, %{}}
   end
