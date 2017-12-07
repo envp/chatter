@@ -13,10 +13,8 @@ defmodule TwitterEngine.Simulator do
   require Logger
 
   def start_link(%{user_count: uc, nchar: nchar}) do
-    {:ok, pid} = GenServer.start_link(
-      __MODULE__,
-      %{user_count: uc, nchar: nchar},
-      name: __MODULE__)
+    {:ok, pid} =
+      GenServer.start_link(__MODULE__, %{user_count: uc, nchar: nchar}, name: __MODULE__)
 
     pid
   end
@@ -36,13 +34,14 @@ defmodule TwitterEngine.Simulator do
     num_tweets = curr_count - prev_count
     interval = :timer.now_diff(now_time, then_time)
 
-    tweet_rate = if interval > 0 do
-      1.0e+6 * (num_tweets / interval)
-    else
-      0
-    end
+    tweet_rate =
+      if interval > 0 do
+        1.0e+6 * (num_tweets / interval)
+      else
+        0
+      end
 
-    Logger.info "Tweets / s: #{tweet_rate}"
+    Logger.info("Tweets / s: #{tweet_rate}")
 
     # Don't bombard the server
     :timer.sleep(1000)
@@ -63,32 +62,33 @@ defmodule TwitterEngine.Simulator do
     |> Zipf.assign_resources(user_list)
     |> Enum.zip(user_list)
     |> Enum.each(fn {follwers, user_pid} ->
-      follwers |> Enum.each(
-          fn follower ->
-            %TwitterEngine.User{id: user_id} = UserProcess.get_user(user_pid)
-            UserProcess.follow(follower, user_id)
-          end)
-      end)
+         follwers
+         |> Enum.each(fn follower ->
+              %TwitterEngine.User{id: user_id} = UserProcess.get_user(user_pid)
+              UserProcess.follow(follower, user_id)
+            end)
+       end)
   end
 
   def init(%{user_count: n}) do
-    Logger.info "Initializing #{n} distinct processes for each user"
+    Logger.info("Initializing #{n} distinct processes for each user")
 
-    state = 1..n |>
-      Enum.map(fn _ -> UserProcess.start_link end)
+    state =
+      1..n
+      |> Enum.map(fn _ -> UserProcess.start_link() end)
 
-    Logger.debug "UserProcess list: #{inspect state}"
+    Logger.debug("UserProcess list: #{inspect(state)}")
 
     {:ok, state}
   end
 
   def handle_call({:setup_users, :zipf}, _from, state) do
-    Logger.info "Linking users into a follower graph"
+    Logger.info("Linking users into a follower graph")
 
     user_procs = state
     link_users(user_procs)
 
-    Logger.info "Completed linkage"
+    Logger.info("Completed linkage")
     {:reply, nil, state}
   end
 
@@ -96,11 +96,12 @@ defmodule TwitterEngine.Simulator do
     # Simulate only fires up the user processes
 
     user_procs = state
+
     user_procs
-    |> Enum.each(
-      fn u ->
-        UserProcess.chatter(u, 10 |>:crypto.strong_rand_bytes |> Base.encode16)
-      end)
+    |> Enum.each(fn u ->
+         UserProcess.chatter(u, 10 |> :crypto.strong_rand_bytes() |> Base.encode16())
+       end)
+
     {:noreply, state}
   end
 end

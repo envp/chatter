@@ -33,6 +33,7 @@ defmodule TwitterEngine.Feed do
   def pop(pid, {id, k}) do
     GenServer.call(pid, {:pop, {id, k}})
   end
+
   def pop(pid, id) do
     GenServer.call(pid, {:pop, id})
   end
@@ -46,12 +47,12 @@ defmodule TwitterEngine.Feed do
   end
 
   def live_feed(pid, {node, remote_pid, id}) do
-    spawn fn ->
+    spawn(fn ->
       item = pop(pid, id)
       :rpc.call(node, UserProcess, :print_tweet, item)
       online = :rpc.call(node, UserProcess, :is_online, remote_pid)
       if item != [] && online, do: live_feed(pid, {node, id})
-    end
+    end)
   end
 
   def init([]) do
@@ -74,11 +75,12 @@ defmodule TwitterEngine.Feed do
   def handle_call({:pop, id}, _from, state) do
     items = Map.get(state, id, [])
 
-    {response, new_state} = if items == [] do
-      {nil, state}
-    else
-      {hd(items), Map.put(state, id, tl(items))}
-    end
+    {response, new_state} =
+      if items == [] do
+        {nil, state}
+      else
+        {hd(items), Map.put(state, id, tl(items))}
+      end
 
     {:reply, response, new_state}
   end
@@ -86,11 +88,12 @@ defmodule TwitterEngine.Feed do
   def handle_call({:peek, id}, _from, state) do
     items = Map.get(state, id, [])
 
-    response = if items == [] do
-      nil
-    else
-      hd(items)
-    end
+    response =
+      if items == [] do
+        nil
+      else
+        hd(items)
+      end
 
     {:reply, response, state}
   end
@@ -98,21 +101,23 @@ defmodule TwitterEngine.Feed do
   def handle_cast({:push, {id, item}}, state) do
     items = Map.get(state, id, [])
 
-    new_state = if items == [] do
-      Map.put(state, id, [item])
-    else
-      # Check for potential overflow and discard the bottom half
-      {trimmed_items, _} = if length(items) >= @max_size do
-        Logger.debug "Trimming feed storage for user: #{id}"
-        n = (length(items) / 2) |> :math.floor |> round
-
-        Enum.split(items, n)
+    new_state =
+      if items == [] do
+        Map.put(state, id, [item])
       else
-        {items, []}
-      end
+        # Check for potential overflow and discard the bottom half
+        {trimmed_items, _} =
+          if length(items) >= @max_size do
+            Logger.debug("Trimming feed storage for user: #{id}")
+            n = (length(items) / 2) |> :math.floor() |> round
 
-      Map.put(state, id, [item | trimmed_items])
-    end
+            Enum.split(items, n)
+          else
+            {items, []}
+          end
+
+        Map.put(state, id, [item | trimmed_items])
+      end
 
     {:noreply, new_state}
   end

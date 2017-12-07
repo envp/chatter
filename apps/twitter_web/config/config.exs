@@ -10,8 +10,7 @@ config :twitter_web, TwitterWeb.Endpoint,
   url: [host: "localhost"],
   secret_key_base: "MeAkU/FXVvfHV2Mpv23Npv0TQFqs0pA1BM8aH7qUqGmXwBbeD1/25epUQdgCu341",
   render_errors: [view: TwitterWeb.ErrorView, accepts: ~w(html json)],
-  pubsub: [name: TwitterWeb.PubSub,
-           adapter: Phoenix.PubSub.PG2]
+  pubsub: [name: TwitterWeb.PubSub, adapter: Phoenix.PubSub.PG2]
 
 # Configures Elixir's Logger
 config :logger, :console,
@@ -20,4 +19,4 @@ config :logger, :console,
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
-import_config "#{Mix.env}.exs"
+import_config "#{Mix.env()}.exs"

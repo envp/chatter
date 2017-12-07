@@ -17,11 +17,7 @@ defmodule TwitterEngine.CoreApi do
   ##
 
   def start_link(%{db: db_pid, feed: feed_pid}) do
-    GenServer.start_link(
-      __MODULE__,
-      %{db: db_pid, feed: feed_pid},
-      name: {:global, __MODULE__}
-    )
+    GenServer.start_link(__MODULE__, %{db: db_pid, feed: feed_pid}, name: {:global, __MODULE__})
   end
 
   def get_user(user_id) do
@@ -29,7 +25,7 @@ defmodule TwitterEngine.CoreApi do
   end
 
   def get_metrics do
-    {get_last_tweet_id(), :os.timestamp}
+    {get_last_tweet_id(), :os.timestamp()}
   end
 
   def get_user_by_handle(uhandle) do
@@ -49,10 +45,7 @@ defmodule TwitterEngine.CoreApi do
   end
 
   def create_tweet(user_id, message) do
-    GenServer.cast(
-      {:global, __MODULE__},
-      {:create_tweet, user_id, Tweet.parse(message)}
-    )
+    GenServer.cast({:global, __MODULE__}, {:create_tweet, user_id, Tweet.parse(message)})
   end
 
   def get_user_tweets(user_id) do
@@ -79,7 +72,7 @@ defmodule TwitterEngine.CoreApi do
   # Server API
   ##
   def init(%{db: db_pid, feed: feed_pid}) do
-    Logger.info "Initalized API at #{inspect self()} with db at #{inspect db_pid}"
+    Logger.info("Initalized API at #{inspect(self())} with db at #{inspect(db_pid)}")
     {:ok, %{db: db_pid, feed: feed_pid}}
   end
 
@@ -137,6 +130,7 @@ defmodule TwitterEngine.CoreApi do
     if Db.user_id_exists(state.db, user_id) do
       Db.insert_tweet(state.db, state.feed, %{tweet | src_id: user_id, creator_id: user_id})
     end
+
     {:noreply, state}
   end
 

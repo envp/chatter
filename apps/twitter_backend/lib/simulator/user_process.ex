@@ -17,9 +17,10 @@ defmodule TwitterEngine.Simulator.UserProcess do
   # Client API
   ##
   def start_link do
-    uhandle = :crypto.strong_rand_bytes(4) |> Base.encode16
+    uhandle = :crypto.strong_rand_bytes(4) |> Base.encode16()
     start_link(%{handle: uhandle, online: true})
   end
+
   def start_link(%{handle: uhandle, online: true}) do
     {:ok, pid} = GenServer.start_link(__MODULE__, %{handle: uhandle, online: true})
     pid
@@ -32,9 +33,9 @@ defmodule TwitterEngine.Simulator.UserProcess do
   def bulk_follow(follower_pid, targets) do
     targets
     |> Enum.each(fn tgt ->
-      %User{id: target_id} = get_user(tgt)
-      follow(follower_pid, target_id)
-    end)
+         %User{id: target_id} = get_user(tgt)
+         follow(follower_pid, target_id)
+       end)
   end
 
   def follow(follower_pid, target_id) do
@@ -66,23 +67,22 @@ defmodule TwitterEngine.Simulator.UserProcess do
   end
 
   def print_tweet(tweet) do
-    IO.inspect tweet
+    IO.inspect(tweet)
   end
 
   def generate_message(message_size) do
-    num_tags = Enum.random([1,2])
+    num_tags = Enum.random([1, 2])
 
     # Generate random 5B types
-    tags = 1..num_tags
+    tags =
+      1..num_tags
       |> Enum.map(fn _ -> "#" <> Base.encode16(:crypto.strong_rand_bytes(4)) end)
 
     tag_string = Enum.join(tags, ",")
     remainder = max(0, message_size - byte_size(tag_string) - 0 - 2)
 
     # The final mess
-    Enum.join([tag_string,
-      Base.encode16(:crypto.strong_rand_bytes(remainder))
-    ], " ")
+    Enum.join([tag_string, Base.encode16(:crypto.strong_rand_bytes(remainder))], " ")
   end
 
   ##
@@ -100,25 +100,28 @@ defmodule TwitterEngine.Simulator.UserProcess do
   end
 
   def handle_call(:get_followers, _from, {user, aff, _followers, online}) do
-    followers = TwitterEngine.CoreApi.get_followers(user.id)
+    followers =
+      TwitterEngine.CoreApi.get_followers(user.id)
       |> Enum.map(fn id -> TwitterEngine.CoreApi.get_user(id).handle end)
+
     {:reply, followers, {user, aff, followers, online}}
   end
 
   def handle_call(:populate_follower_cache, _from, {user, aff, _followers, online}) do
-    followers = TwitterEngine.CoreApi.get_followers(user.id)
+    followers =
+      TwitterEngine.CoreApi.get_followers(user.id)
       |> Enum.map(fn id -> TwitterEngine.CoreApi.get_user(id).handle end)
 
     {:noreply, {user, aff, followers, online}}
   end
 
   def handle_call(:is_online, _from, {user, aff, followers, online}) do
-    {:reply, online,{user, aff, followers, online}}
+    {:reply, online, {user, aff, followers, online}}
   end
 
   def handle_cast({:follow, target_id}, {user, aff, followers, online}) do
     if user.id != target_id do
-      Logger.debug "User #{user.id} following #{target_id}"
+      Logger.debug("User #{user.id} following #{target_id}")
       %User{id: follower_id} = user
 
       TwitterEngine.CoreApi.add_follower(target_id, follower_id)
@@ -146,6 +149,7 @@ defmodule TwitterEngine.Simulator.UserProcess do
 
       TwitterEngine.CoreApi.create_tweet(user.id, message)
     end
+
     {:noreply, {user, aff, followers, online}}
   end
 
@@ -157,6 +161,7 @@ defmodule TwitterEngine.Simulator.UserProcess do
     if online do
       TwitterEngine.Feed.live_feed(feed_pid, {Node.self(), self(), user.id})
     end
+
     {user, aff, followers, online}
   end
 end

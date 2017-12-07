@@ -11,13 +11,15 @@ defmodule TwitterEngine.Tweet do
 
   # Parses the message to extract mentions and hashtags
   def parse(msg) do
-    mentions = Regex.scan(~r/@([\w\d_]+)/, msg)
+    mentions =
+      Regex.scan(~r/@([\w\d_]+)/, msg)
       |> Enum.map(fn [_, capture] -> String.downcase(capture) end)
-      |> Enum.uniq
+      |> Enum.uniq()
 
-    hashtags = Regex.scan(~r/#([\w\d_]+)/, msg)
+    hashtags =
+      Regex.scan(~r/#([\w\d_]+)/, msg)
       |> Enum.map(fn [_, capture] -> String.downcase(capture) end)
-      |> Enum.uniq
+      |> Enum.uniq()
 
     %__MODULE__{text: msg, mentions: mentions, hashtags: hashtags}
   end

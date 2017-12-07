@@ -39,17 +39,15 @@ defmodule TwitterEngine.CLI do
   require Logger
 
   defp parse_args(argv) do
-    {opts, _, _} = OptionParser.parse(
-      argv,
-      switches: [
+    {opts, _, _} =
+      OptionParser.parse(argv, switches: [
         mode: :string,
         address: :string,
         size: :integer,
         nchar: :integer,
         help: :boolean,
         uname: :string
-      ]
-    )
+      ])
 
     opts
   end
@@ -66,14 +64,14 @@ defmodule TwitterEngine.CLI do
       exit("No remote process alive!")
     end
 
-    :global.sync
+    :global.sync()
 
     Logger.debug("Connected to EPMD node #{remote_name}")
   end
 
   defp start_backend_server do
-    {:ok, db_pid} = TwitterEngine.Database.start_link
-    {:ok, feed_pid} = TwitterEngine.Feed.start_link
+    {:ok, db_pid} = TwitterEngine.Database.start_link()
+    {:ok, feed_pid} = TwitterEngine.Feed.start_link()
 
     Logger.debug("Starting twitter server actor. Waiting for connections.")
     TwitterEngine.CoreApi.start_link(%{db: db_pid, feed: feed_pid})
@@ -83,7 +81,7 @@ defmodule TwitterEngine.CLI do
     opts = argv |> parse_args
 
     if opts[:help] do
-      IO.puts @moduledoc
+      IO.puts(@moduledoc)
     else
       n_users = opts[:size] || 100
       tw_size = opts[:nchar] || 20
@@ -113,28 +111,25 @@ defmodule TwitterEngine.CLI do
           # Attempt to join a known network that is the bee's knees or die trying
           join_or_die(rem_name)
 
-          :global.sync
+          :global.sync()
 
           # Start the simulator by telling it how many users to simulate
           # and where the remote process lives
-          TwitterEngine.Simulator.start_link(
-            %{user_count: n_users, nchar: tw_size}
-          )
+          TwitterEngine.Simulator.start_link(%{user_count: n_users, nchar: tw_size})
 
           TwitterEngine.Simulator.setup_users(:zipf)
-          TwitterEngine.Simulator.start_simulation
-          TwitterEngine.Simulator.print_metrics({0, :os.timestamp})
+          TwitterEngine.Simulator.start_simulation()
+          TwitterEngine.Simulator.print_metrics({0, :os.timestamp()})
 
-          Logger.info "End of simulation"
+          Logger.info("End of simulation")
           # Simulation begins here
           :timer.sleep(:infinity)
 
-      # "client" ->
+        # "client" ->
 
-      _ ->
-        Logger.error("Unknown option for mode: #{opts[:mode]}")
+        _ ->
+          Logger.error("Unknown option for mode: #{opts[:mode]}")
       end
     end
   end
 end
-
