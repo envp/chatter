@@ -97,7 +97,7 @@ defmodule TwitterEngine.CLI do
         "server" ->
           own_name = :erlang.list_to_atom('master@' ++ to_charlist(opts[:address]))
           setup_distributed_node(own_name)
-          start_backend_server()
+          TwitterEngine.Application.start([], [])
 
           :timer.sleep(:infinity)
 
@@ -110,8 +110,6 @@ defmodule TwitterEngine.CLI do
 
           # Attempt to join a known network that is the bee's knees or die trying
           join_or_die(rem_name)
-
-          :global.sync()
 
           # Start the simulator by telling it how many users to simulate
           # and where the remote process lives

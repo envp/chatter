@@ -18,40 +18,40 @@ defmodule TwitterEngine.Feed do
   @max_size 1024
 
   def start_link do
-    GenServer.start_link(__MODULE__, [])
+    GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
 
-  def push(pid, {id, item}) do
-    GenServer.cast(pid, {:push, {id, item}})
+  def push({id, item}) do
+    GenServer.cast(__MODULE__, {:push, {id, item}})
   end
 
-  def state(pid) do
-    GenServer.call(pid, :state)
+  def state do
+    GenServer.call(__MODULE__, :state)
   end
 
   # Match the more specific clause first
-  def pop(pid, {id, k}) do
-    GenServer.call(pid, {:pop, {id, k}})
+  def pop({id, k}) do
+    GenServer.call(__MODULE__, {:pop, {id, k}})
   end
 
-  def pop(pid, id) do
-    GenServer.call(pid, {:pop, id})
+  def pop(id) do
+    GenServer.call(__MODULE__, {:pop, id})
   end
 
-  def peek(pid, id) do
-    GenServer.call(pid, {:peek, id})
+  def peek(id) do
+    GenServer.call(__MODULE__, {:peek, id})
   end
 
-  def flush_all(pid) do
-    GenServer.cast(pid, :flush_all)
+  def flush_all do
+    GenServer.cast(__MODULE__, :flush_all)
   end
 
-  def live_feed(pid, {node, remote_pid, id}) do
+  def live_feed({node, remote_pid, id}) do
     spawn(fn ->
-      item = pop(pid, id)
+      item = pop(id)
       :rpc.call(node, UserProcess, :print_tweet, item)
       online = :rpc.call(node, UserProcess, :is_online, remote_pid)
-      if item != [] && online, do: live_feed(pid, {node, id})
+      if item != [] && online, do: live_feed({node, id})
     end)
   end
 

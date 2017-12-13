@@ -16,8 +16,9 @@ defmodule TwitterEngine.CoreApi do
   # Client API
   ##
 
-  def start_link(%{db: db_pid, feed: feed_pid}) do
-    GenServer.start_link(__MODULE__, %{db: db_pid, feed: feed_pid}, name: {:global, __MODULE__})
+  def start_link, do: start_link([])
+  def start_link(_) do
+    GenServer.start_link(__MODULE__, [], name: {:global, __MODULE__})
   end
 
   def get_user(user_id) do
@@ -71,73 +72,77 @@ defmodule TwitterEngine.CoreApi do
   ##
   # Server API
   ##
-  def init(%{db: db_pid, feed: feed_pid}) do
-    Logger.info("Initalized API at #{inspect(self())} with db at #{inspect(db_pid)}")
-    {:ok, %{db: db_pid, feed: feed_pid}}
+  def init, do: init([])
+  def init(_) do
+    db_pid = Process.whereis(TwitterEngine.Database)
+    feed_pid = Process.whereis(TwitterEngine.Feed)
+    Logger.info("Initalized API at #{inspect(self())} with db @ #{inspect(db_pid)}, feeds @ #{inspect(feed_pid)}")
+
+    {:ok, %{}}
   end
 
   #
   # Calls
   #
   def handle_call({:get_user, user_id}, _from, state) do
-    {:reply, Db.get_user(state.db, user_id), state}
+    {:reply, Db.get_user(user_id), state}
   end
 
   def handle_call({:get_user_by_handle, uhandle}, _from, state) do
-    {:reply, Db.get_user_by_handle(state.db, uhandle), state}
+    {:reply, Db.get_user_by_handle(uhandle), state}
   end
 
   def handle_call({:get_followers, user_id}, _from, state) do
-    {:reply, Db.get_followers(state.db, user_id), state}
+    {:reply, Db.get_followers(user_id), state}
   end
 
   def handle_call({:get_user_tweets, user_id}, _from, state) do
-    all_tweets = Db.get_tweet_contents(state.db, user_id)
+    all_tweets = Db.get_tweet_contents(user_id)
 
     {:reply, all_tweets, state}
   end
 
   def handle_call({:get_mention_tweets, user_id}, _from, state) do
-    all_tweets = Db.get_mentions(state.db, user_id)
+    all_tweets = Db.get_mentions(user_id)
 
     {:reply, all_tweets, state}
   end
 
   def handle_call({:get_hashtag_tweets, tag}, _from, state) do
-    all_tweets = Db.get_hashtag_tweets(state.db, tag)
+    all_tweets = Db.get_hashtag_tweets(tag)
 
     {:reply, all_tweets, state}
   end
 
   def handle_call(:get_last_tweet_id, _from, state) do
-    {:reply, Db.get_last_tweet_id(state.db), state}
+    {:reply, Db.get_last_tweet_id(), state}
   end
 
   #
   # Casts
   #
   def handle_cast({:insert_user, user}, state) do
-    Db.insert_user(state.db, user)
+    Db.insert_user(user)
     {:noreply, state}
   end
 
   def handle_cast({:follow, target_id, follower_id}, state) do
-    Db.add_follower(state.db, target_id, follower_id)
+    Db.add_follower(target_id, follower_id)
     {:noreply, state}
   end
 
   def handle_cast({:create_tweet, user_id, tweet}, state) do
-    if Db.user_id_exists(state.db, user_id) do
-      Db.insert_tweet(state.db, state.feed, %{tweet | src_id: user_id, creator_id: user_id})
+    if Db.user_id_exists(user_id) do
+      Db.insert_tweet(%{tweet | src_id: user_id, creator_id: user_id})
     end
 
     {:noreply, state}
   end
 
   def handle_cast({:retweet, tweet_id, user_id}, state) do
-    if Db.user_id_exists(state.db, user_id) && Db.tweet_id_exists(state.db, tweet_id) do
-      tweet = %{Db.get_tweet(state.db, tweet_id) | creator_id: user_id}
-      Db.insert_retweet(state.db, state.feed, tweet)
+    if Db.user_id_exists(user_id) && Db.tweet_id_exists(tweet_id) do
+      tweet = %{Db.get_tweet(tweet_id) | creator_id: user_id}
+      Db.insert_retweet(tweet)
     end
   end
 end

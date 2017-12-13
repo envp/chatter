@@ -5,16 +5,18 @@ defmodule TwitterEngine.Application do
 
   use Application
 
+  import Supervisor.Spec
+
   def start(_type, _args) do
     # List all child processes to be supervised
     children = [
-      # Starts a worker by calling: TwitterEngine.Worker.start_link(arg)
-      # {TwitterEngine.Worker, arg},
+      worker(TwitterEngine.Feed, [], restart: :permanent),
+      worker(TwitterEngine.Database, [], restart: :permanent),
+      worker(TwitterEngine.CoreApi, [], restart: :permanent)
     ]
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: TwitterEngine.Supervisor]
+    # If any of the components fails to start or crashes, reload everything
+    opts = [strategy: :one_for_all, name: TwitterEngine.Supervisor]
     Supervisor.start_link(children, opts)
   end
 end

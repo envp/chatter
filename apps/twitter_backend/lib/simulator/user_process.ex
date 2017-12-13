@@ -159,7 +159,7 @@ defmodule TwitterEngine.Simulator.UserProcess do
 
   def handle_cast({:get_feed, feed_pid}, {user, aff, followers, online}) do
     if online do
-      TwitterEngine.Feed.live_feed(feed_pid, {Node.self(), self(), user.id})
+      TwitterEngine.Feed.live_feed({Node.self(), self(), user.id})
     end
 
     {user, aff, followers, online}

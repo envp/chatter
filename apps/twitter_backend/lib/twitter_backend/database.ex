@@ -16,89 +16,89 @@ defmodule TwitterEngine.Database do
     GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
   end
 
-  def get_user(pid, user_id) do
-    GenServer.call(pid, {:get_user, user_id}, @timeout)
+  def get_user(user_id) do
+    GenServer.call(__MODULE__, {:get_user, user_id}, @timeout)
   end
 
-  def get_tweet(pid, tweet_id) do
-    GenServer.call(pid, {:get_tweet, tweet_id}, @timeout)
+  def get_tweet(tweet_id) do
+    GenServer.call(__MODULE__, {:get_tweet, tweet_id}, @timeout)
   end
 
-  def get_user_by_handle(pid, uhandle) do
-    GenServer.call(pid, {:get_user_by_handle, uhandle})
+  def get_user_by_handle(uhandle) do
+    GenServer.call(__MODULE__, {:get_user_by_handle, uhandle})
   end
 
-  def insert_user(pid, user) do
-    if user_handle_exists(pid, user.handle) do
+  def insert_user(user) do
+    if user_handle_exists(user.handle) do
       :error
     else
-      GenServer.cast(pid, {:insert_user, user})
+      GenServer.cast(__MODULE__, {:insert_user, user})
     end
   end
 
-  def user_handle_exists(pid, uhandle) do
-    GenServer.call(pid, {:is_user_handle, uhandle}, @timeout)
+  def user_handle_exists(uhandle) do
+    GenServer.call(__MODULE__, {:is_user_handle, uhandle}, @timeout)
   end
 
-  def user_id_exists(pid, user_id) do
-    GenServer.call(pid, {:is_user, user_id}, @timeout)
+  def user_id_exists(user_id) do
+    GenServer.call(__MODULE__, {:is_user, user_id}, @timeout)
   end
 
-  def tweet_id_exists(pid, tweet_id) do
-    GenServer.call(pid, {:is_tweet, tweet_id}, @timeout)
+  def tweet_id_exists(tweet_id) do
+    GenServer.call(__MODULE__, {:is_tweet, tweet_id}, @timeout)
   end
 
-  def add_follower(pid, target_id, follower_id) do
+  def add_follower(target_id, follower_id) do
     cond do
       target_id == follower_id ->
         :error
 
-      user_id_exists(pid, target_id) && user_id_exists(pid, follower_id) ->
-        GenServer.cast(pid, {:follow, target_id, follower_id})
+      user_id_exists(target_id) && user_id_exists(follower_id) ->
+        GenServer.cast(__MODULE__, {:follow, target_id, follower_id})
 
       true ->
         :error
     end
   end
 
-  def get_followers(pid, user_id) do
-    if user_id_exists(pid, user_id) do
-      GenServer.call(pid, {:get_followers, user_id}, @timeout)
+  def get_followers(user_id) do
+    if user_id_exists(user_id) do
+      GenServer.call(__MODULE__, {:get_followers, user_id}, @timeout)
     else
       nil
     end
   end
 
-  def insert_tweet(pid, feed_pid, tweet) do
+  def insert_tweet(tweet) do
     # Specifically this to ensure that tweet sequence numbers are increasing
-    GenServer.cast(pid, {:insert_tweet, feed_pid, tweet})
+    GenServer.cast(__MODULE__, {:insert_tweet, tweet})
   end
 
-  def insert_retweet(pid, feed_pid, tweet) do
+  def insert_retweet(tweet) do
     # Specifically this to ensure that tweet sequence numbers are increasing
-    GenServer.cast(pid, {:insert_retweet, feed_pid, tweet})
+    GenServer.cast(__MODULE__, {:insert_retweet, tweet})
   end
 
-  def get_tweet_ids(pid, user_id) do
-    GenServer.call(pid, {:get_tweet_ids, user_id}, @timeout)
+  def get_tweet_ids(user_id) do
+    GenServer.call(__MODULE__, {:get_tweet_ids, user_id}, @timeout)
   end
 
-  def get_tweet_contents(pid, ids) when is_list(ids) do
-    GenServer.call(pid, {:get_tweet_contents, ids})
+  def get_tweet_contents(ids) when is_list(ids) do
+    GenServer.call(__MODULE__, {:get_tweet_contents, ids})
   end
 
-  def get_tweet_contents(pid, tweet_id), do: get_tweet_contents(pid, [tweet_id])
+  def get_tweet_contents(tweet_id), do: get_tweet_contents([tweet_id])
 
-  def get_mentions(pid, user_id) do
-    GenServer.call(pid, {:get_mentions, user_id}, @timeout)
+  def get_mentions(user_id) do
+    GenServer.call(__MODULE__, {:get_mentions, user_id}, @timeout)
   end
 
-  def get_hashtag_tweets(pid, tag) do
-    GenServer.call(pid, {:get_hashtag_tweets, tag})
+  def get_hashtag_tweets(tag) do
+    GenServer.call(__MODULE__, {:get_hashtag_tweets, tag})
   end
 
-  def get_last_tweet_id(pid) do
-    GenServer.call(pid, :get_last_tweet_id, @timeout)
+  def get_last_tweet_id do
+    GenServer.call(__MODULE__, :get_last_tweet_id, @timeout)
   end
 
   ##
@@ -354,7 +354,7 @@ defmodule TwitterEngine.Database do
     {:noreply, state}
   end
 
-  def handle_cast({:insert_tweet, feed_pid, tweet}, {user_seqnum, tweet_seqnum, user_inverse}) do
+  def handle_cast({:insert_tweet, tweet}, {user_seqnum, tweet_seqnum, user_inverse}) do
     tweet = %{tweet | id: tweet_seqnum + 1}
 
     Logger.debug("Insert tweet #{inspect(tweet)}")
@@ -369,7 +369,7 @@ defmodule TwitterEngine.Database do
     :ets.lookup(:followers, tweet.creator_id)
     |> Enum.map(fn {_, v} -> v end)
     |> Enum.each(fn f_id ->
-         TwitterEngine.Feed.push(feed_pid, {f_id, tweet.id})
+         TwitterEngine.Feed.push({f_id, tweet.id})
        end)
 
     # Insert this tweet id for its mentions
@@ -380,7 +380,7 @@ defmodule TwitterEngine.Database do
          :ets.insert(:mentions, {m_id, tweet.id})
 
          # Also record this in the feed
-         TwitterEngine.Feed.push(feed_pid, {m_id, tweet.id})
+         TwitterEngine.Feed.push({m_id, tweet.id})
        end)
 
     # Insert this tweet into its hashtags table
@@ -390,7 +390,7 @@ defmodule TwitterEngine.Database do
     {:noreply, {user_seqnum, tweet_seqnum + 1, user_inverse}}
   end
 
-  def handle_cast({:insert_retweet, feed_pid, tweet}, {user_seqnum, tweet_seqnum, user_inverse}) do
+  def handle_cast({:insert_retweet, tweet}, {user_seqnum, tweet_seqnum, user_inverse}) do
     tweet = %{tweet | id: tweet_seqnum + 1}
 
     Logger.debug("Insert re-tweet #{inspect(tweet)}")
@@ -405,7 +405,7 @@ defmodule TwitterEngine.Database do
     :ets.lookup(:followers, tweet.creator_id)
     |> Enum.map(fn {_, v} -> v end)
     |> Enum.each(fn f_id ->
-         TwitterEngine.Feed.push(feed_pid, {f_id, tweet.id})
+         TwitterEngine.Feed.push({f_id, tweet.id})
        end)
 
     ##################################################################
@@ -420,7 +420,7 @@ defmodule TwitterEngine.Database do
     #   :ets.insert(:mentions, {m_id, tweet.id})
 
     #   # Also record this in the feed
-    #   TwitterEngine.Feed.push(feed_pid, {m_id, tweet.id})
+    #   TwitterEngine.Feed.push({m_id, tweet.id})
     # end)
 
     # # Insert this tweet into its hashtags table
