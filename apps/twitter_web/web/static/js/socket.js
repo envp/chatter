@@ -55,9 +55,24 @@ let socket = new Socket("/socket", {params: {token: window.userToken}})
 socket.connect()
 
 // Now that you are connected, you can join channels with a topic:
-let channel = socket.channel("topic:subtopic", {})
+let channel = socket.channel("room:home", {})
 channel.join()
   .receive("ok", resp => { console.log("Joined successfully", resp) })
   .receive("error", resp => { console.log("Unable to join", resp) })
 
 export default socket
+
+// User interface
+let tweetInput = $("#tweet-input");
+let tweetContainer = $("#tweets");
+
+tweetInput.on("keypress", event => {
+  if(event.keyCode === 13){
+    channel.push("new_message", {body:tweetInput.val()});
+    tweetInput.val("");
+  }
+});
+
+channel.on("new_message", payload => {
+  tweetContainer.append(`<br/>[${Date()}] ${payload.body}`)
+})

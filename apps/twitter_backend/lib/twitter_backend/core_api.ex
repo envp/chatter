@@ -46,7 +46,7 @@ defmodule TwitterEngine.CoreApi do
   end
 
   def create_tweet(user_id, message) do
-    GenServer.cast({:global, __MODULE__}, {:create_tweet, user_id, Tweet.parse(message)})
+    GenServer.call({:global, __MODULE__}, {:create_tweet, user_id, Tweet.parse(message)}, @timeout)
   end
 
   def get_user_tweets(user_id) do
@@ -67,6 +67,10 @@ defmodule TwitterEngine.CoreApi do
 
   def retweet(user_id, tweet_id) do
     GenServer.cast({:global, __MODULE__}, {:retweet, tweet_id, user_id})
+  end
+
+  def get_subscriptions(user_id) do
+    GenServer.call({:global, __MODULE__}, {:get_subsrciptions, user_id}, @timeout)
   end
 
   ##
@@ -118,6 +122,20 @@ defmodule TwitterEngine.CoreApi do
     {:reply, Db.get_last_tweet_id(), state}
   end
 
+  def handle_call({:create_tweet, user_id, tweet}, _from, state) do
+    tw_id = if Db.user_id_exists(user_id) do
+      Db.insert_tweet(%{tweet | src_id: user_id, creator_id: user_id})
+    else
+      -1
+    end
+
+    {:reply, tw_id, state}
+  end
+
+  def handle_call({:get_subsrciptions, user_id}, _from, state) do
+    {:reply, Db.get_subscriptions(user_id), state}
+  end
+
   #
   # Casts
   #
@@ -128,14 +146,6 @@ defmodule TwitterEngine.CoreApi do
 
   def handle_cast({:follow, target_id, follower_id}, state) do
     Db.add_follower(target_id, follower_id)
-    {:noreply, state}
-  end
-
-  def handle_cast({:create_tweet, user_id, tweet}, state) do
-    if Db.user_id_exists(user_id) do
-      Db.insert_tweet(%{tweet | src_id: user_id, creator_id: user_id})
-    end
-
     {:noreply, state}
   end
 

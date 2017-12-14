@@ -71,7 +71,7 @@ defmodule TwitterEngine.Database do
 
   def insert_tweet(tweet) do
     # Specifically this to ensure that tweet sequence numbers are increasing
-    GenServer.cast(__MODULE__, {:insert_tweet, tweet})
+    GenServer.call(__MODULE__, {:insert_tweet, tweet}, @timeout)
   end
 
   def insert_retweet(tweet) do
@@ -99,6 +99,10 @@ defmodule TwitterEngine.Database do
 
   def get_last_tweet_id do
     GenServer.call(__MODULE__, :get_last_tweet_id, @timeout)
+  end
+
+  def get_subscriptions(user_id) do
+    GenServer.call(__MODULE__, {:get_subsrciptions, user_id}, @timeout)
   end
 
   ##
@@ -160,7 +164,16 @@ defmodule TwitterEngine.Database do
       write_concurrency: true
     ])
 
-    # Inverse-map of user handle to user id
+    # Who has this user followed
+    :ets.new(:subscriptions, [
+      :bag,
+      :private,
+      :named_table,
+      read_concurrency: true,
+      write_concurrency: true
+    ])
+
+    # Inverse-map of user handle to user id or process handle to user id
     user_inverse = %{}
 
     # The state is represented by the user and tweet sequence numbers
@@ -333,28 +346,7 @@ defmodule TwitterEngine.Database do
     {:reply, result, state}
   end
 
-  #
-  # Casts
-  #
-  def handle_cast({:insert_user, user}, state) do
-    {user_seqnum, tweet_seqnum, user_inverse} = state
-
-    user = %{user | id: user_seqnum + 1}
-    :ets.insert(:users, {user_seqnum + 1, user})
-    user_inverse = Map.put(user_inverse, user.handle, user_seqnum + 1)
-
-    Logger.debug("Insert user #{inspect(user)}")
-    {:noreply, {user_seqnum + 1, tweet_seqnum, user_inverse}}
-  end
-
-  def handle_cast({:follow, target_id, follower_id}, state) do
-    Logger.debug("User #{follower_id} followed User #{target_id}")
-
-    :ets.insert(:followers, {target_id, follower_id})
-    {:noreply, state}
-  end
-
-  def handle_cast({:insert_tweet, tweet}, {user_seqnum, tweet_seqnum, user_inverse}) do
+  def handle_call({:insert_tweet, tweet}, _from, {user_seqnum, tweet_seqnum, user_inverse}) do
     tweet = %{tweet | id: tweet_seqnum + 1}
 
     Logger.debug("Insert tweet #{inspect(tweet)}")
@@ -387,7 +379,39 @@ defmodule TwitterEngine.Database do
     tweet.hashtags
     |> Enum.each(fn htag -> :ets.insert(:hashtags, {htag, tweet.id}) end)
 
-    {:noreply, {user_seqnum, tweet_seqnum + 1, user_inverse}}
+    {:reply, tweet_seqnum + 1, {user_seqnum, tweet_seqnum + 1, user_inverse}}
+  end
+
+  def handle_call({:get_subsrciptions, user_id}, _from, state) do
+    Logger.debug("Query subscriptions for user #{user_id}")
+
+    response = :ets.lookup(:subscriptions, user_id) |> Enum.map(fn {_, v} -> v end)
+
+    Logger.debug("Found #{length(response)} subscriptions")
+    {:reply, response, state}
+  end
+
+  #
+  # Casts
+  #
+  def handle_cast({:insert_user, user}, state) do
+    {user_seqnum, tweet_seqnum, user_inverse} = state
+
+    user = %{user | id: user_seqnum + 1}
+    :ets.insert(:users, {user_seqnum + 1, user})
+    user_inverse = Map.put(user_inverse, user.handle, user_seqnum + 1)
+    user_inverse = Map.put(user_inverse, user.chan, user_seqnum + 1)
+
+    Logger.debug("Insert user #{inspect(user)}")
+    {:noreply, {user_seqnum + 1, tweet_seqnum, user_inverse}}
+  end
+
+  def handle_cast({:follow, target_id, follower_id}, state) do
+    Logger.debug("User #{follower_id} followed User #{target_id}")
+
+    :ets.insert(:followers, {target_id, follower_id})
+    :ets.insert(:subscriptions, {follower_id, target_id})
+    {:noreply, state}
   end
 
   def handle_cast({:insert_retweet, tweet}, {user_seqnum, tweet_seqnum, user_inverse}) do
