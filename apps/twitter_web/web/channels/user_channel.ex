@@ -57,6 +57,15 @@ defmodule TwitterWeb.UserChannel do
     {:noreply, socket}
   end
 
+  def handle_in("query_tag", %{"tag" => tag, "handle" => uhandle}, socket) do
+    user = CoreApi.get_user_by_handle(uhandle)
+    tweets = CoreApi.get_hashtag_tweets(tag)
+
+    send user.chan, {:query_tag, tweets}
+
+    {:noreply, socket}
+  end
+
   ##
   # INFO
   ##
@@ -73,6 +82,17 @@ defmodule TwitterWeb.UserChannel do
   def handle_info({:retweet, retweeter, tweet}, socket) do
     # Logger.warn inspect(%{handle: retweeter.handle, tweet: tweet})
     push socket, "retweet", %{handle: retweeter.handle, tweet: tweet}
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:query_tag, tweets}, socket) do
+    Logger.warn inspect(tweets)
+
+    msgs = tweets
+      |> Enum.map(fn tw -> Map.get(tw, :text) end)
+
+    push socket, "query_tag", %{tweets: msgs}
 
     {:noreply, socket}
   end

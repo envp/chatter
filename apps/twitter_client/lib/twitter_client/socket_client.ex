@@ -28,6 +28,10 @@ defmodule TwitterClient.SocketClient do
     send pid, {:retweet, user_handle, tweet_id}
   end
 
+  def query_tag(pid, user_handle, tag) do
+    send pid, {:query_tag, user_handle, tag}
+  end
+
   def init(url) do
     {:connect, url, [], %{first_join: true}}
   end
@@ -90,6 +94,11 @@ defmodule TwitterClient.SocketClient do
     {:ok, state}
   end
 
+  def handle_info({:query_tag, user_handle, tag}, transport, state) do
+    GenSocketClient.push(transport, "user:*", "query_tag", %{tag: tag, handle: user_handle})
+    {:ok, state}
+  end
+
   def handle_message("user:*", "new_follower", %{"handle" => handle, "id" => id}, _transport, state) do
     Logger.info("\nUser @#{handle}(id=#{id}) started following you!\n")
     {:ok, state}
@@ -102,6 +111,11 @@ defmodule TwitterClient.SocketClient do
 
   def handle_message("user:*", "retweet", %{"handle" => uhandle, "tweet" => tweet}, _transport, state) do
     Logger.info("\nUser @#{uhandle} retweeted your tweet(id=#{Map.get(tweet, "id")}): #{Map.get(tweet, "text")}\n")
+    {:ok, state}
+  end
+
+  def handle_message("user:*", "query_tag", %{"tweets" => msgs}, _transport, state) do
+    Logger.info("\n#{inspect(msgs)}\n")
     {:ok, state}
   end
 
