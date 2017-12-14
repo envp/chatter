@@ -73,6 +73,10 @@ defmodule TwitterEngine.CoreApi do
     GenServer.call({:global, __MODULE__}, {:get_subsrciptions, user_id}, @timeout)
   end
 
+  def get_tweet(tweet_id) do
+    GenServer.call({:global, __MODULE__}, {:get_tweet, tweet_id}, @timeout)
+  end
+
   ##
   # Server API
   ##
@@ -136,6 +140,10 @@ defmodule TwitterEngine.CoreApi do
     {:reply, Db.get_subscriptions(user_id), state}
   end
 
+  def handle_call({:get_tweet, tweet_id}, _from, state) do
+    {:reply, Db.get_tweet(tweet_id), state}
+  end
+
   #
   # Casts
   #
@@ -154,5 +162,6 @@ defmodule TwitterEngine.CoreApi do
       tweet = %{Db.get_tweet(tweet_id) | creator_id: user_id}
       Db.insert_retweet(tweet)
     end
+    {:noreply, state}
   end
 end

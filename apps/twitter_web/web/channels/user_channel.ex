@@ -1,7 +1,7 @@
 defmodule TwitterWeb.UserChannel do
   use Phoenix.Channel
 
-  alias TwitterEngine.{User, CoreApi, Tweet}
+  alias TwitterEngine.CoreApi
   require Logger
 
   Phoenix.Channel.intercept ["new_tweet"]
@@ -45,6 +45,18 @@ defmodule TwitterWeb.UserChannel do
     {:noreply, socket}
   end
 
+  def handle_in("retweet", %{"author" => author, "id" => id}, socket) do
+    tweet = CoreApi.get_tweet(id)
+    user = CoreApi.get_user_by_handle(author)
+    op = CoreApi.get_user(tweet.creator_id)
+
+    CoreApi.retweet(user.id, id)
+
+    send op.chan, {:retweet, user, tweet}
+
+    {:noreply, socket}
+  end
+
   ##
   # INFO
   ##
@@ -55,6 +67,13 @@ defmodule TwitterWeb.UserChannel do
 
   def handle_info({:new_tweet, author, msg, tweet_id}, socket) do
     push socket, "new_tweet", %{author: author, content: msg, id: tweet_id}
+    {:noreply, socket}
+  end
+
+  def handle_info({:retweet, retweeter, tweet}, socket) do
+    # Logger.warn inspect(%{handle: retweeter.handle, tweet: tweet})
+    push socket, "retweet", %{handle: retweeter.handle, tweet: tweet}
+
     {:noreply, socket}
   end
 end
