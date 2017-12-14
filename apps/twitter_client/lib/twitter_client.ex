@@ -12,8 +12,6 @@ defmodule TwitterClient do
     Create a new tweet
   * retweet <tweet_id>
     Retweet an existing tweet (must know its sequence identifier)
-  * feed
-    View your feed
   -----------------------------
   """
   @prompt inspect(__MODULE__) <> " $ "
@@ -33,8 +31,6 @@ defmodule TwitterClient do
         :tweet
       String.starts_with?(cmd, "retweet") ->
         :retweet
-      String.starts_with?(cmd, "retweet") ->
-        :feed
       true ->
         :error
     end
@@ -42,7 +38,7 @@ defmodule TwitterClient do
 
   defp parse(cmd) do
     kind = kind_of(cmd)
-    if kind in [:help, :connect, :register, :follow, :tweet, :retweet, :feed] do
+    if kind in [:help, :connect, :register, :follow, :tweet, :retweet] do
       parse(kind, cmd)
     else
       {:error, :invalid_command}
@@ -68,9 +64,6 @@ defmodule TwitterClient do
     {id_num, ""} = Integer.parse(id)
     {:retweet, id_num}
   end
-  defp parse(:feed, _cmd) do
-    :feed
-  end
 
   defp process(:help, _conn, state) do
     IO.puts @moduledoc
@@ -88,6 +81,11 @@ defmodule TwitterClient do
     TwitterClient.SocketClient.tweet(conn, state.handle, message)
     state
   end
+  defp process({:retweet, id}, conn, state) do
+    TwitterClient.SocketClient.retweet(conn, state.handle, id)
+    state
+  end
+  defp process(_, conn, state), do: process(:help, conn, state)
 
   def input_loop(conn, state) do
     new_state = IO.gets(@prompt)

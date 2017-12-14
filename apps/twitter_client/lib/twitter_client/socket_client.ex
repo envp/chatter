@@ -24,6 +24,10 @@ defmodule TwitterClient.SocketClient do
     send pid, {:tweet, ahandle, message}
   end
 
+  def retweet(pid, user_handle, tweet_id) do
+    send pid, {:retweet, user_handle, tweet_id}
+  end
+
   def init(url) do
     {:connect, url, [], %{first_join: true}}
   end
